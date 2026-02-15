@@ -163,3 +163,68 @@ When the decision is “Fix,” apply this checklist:
    - Run parsing code with minimal filesystem/network privileges.  
    - Ensure no access to sensitive paths or internal endpoints that XXE could abuse. [jcarpizo.github](https://jcarpizo.github.io/owasp-info/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html)
 
+Here’s a Markdown **process** you can train the team on for the “Invisible bidirectional and homoglyph Unicode characters” / Trojan Source–style policy (CWE‑506). [app.cycode](https://app.cycode.com/violations?f0=status&f0=Open&f1=risk_score_range&f1=risk_score_from%3D30&f1=risk_score_to%3D100&f1=include_null_risk_score%3Dtrue&f2=labels&f2=production&s=risk_score%2Cdesc&tenantId=ee7872ab-a58c-4a79-8485-a08d06b890e6&appsecModule=sast&ids=019aa0d0-d65d-7e59-a861-db50f5751b3a&showPartialPolicy=false&policyId=d20f5f00-7535-447a-b163-1744c384971b&groupBy=Policy&drawer=ZKE0DYH4pF&ZKE0DYH4pF_component=ViolationV2&ZKE0DYH4pF_id=07c6cc96-2b1c-4c38-9f24-5ac31688570b&ZKE0DYH4pF_ViolationV2_table=regular-policy-table)
+
+***
+
+# Trojan Source / Invisible Unicode Triage Process  
+_For “Invisible bidirectional and homoglyph Unicode characters” (CWE‑506) findings_ [owasp](https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing)
+
+## Step 1 – Locate and inspect the flagged code
+
+1. Open the exact file and line(s) referenced by the finding in a plain‑text editor that can show hidden characters (or enable “show invisibles / control characters”). 
+2. Confirm whether there are:  
+   - Bidirectional control characters (e.g., U+202A–U+202E, U+2066–U+2069), or  
+   - Confusable homoglyphs in identifiers or string literals (e.g., mixing Latin and Cyrillic look‑alikes). [owasp](https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing)
+
+***
+
+## Step 2 – Determine if the characters are necessary
+
+For each occurrence:
+
+1. Ask: **Is there a legitimate, documented reason** to use these characters here?  
+   - Examples might include localization tests or very specific formatting requirements in data, not typical application logic.  
+2. Check comments, documentation, or commit history for any explanation.  
+   - If there is no clear justification, treat the usage as suspicious by default. 
+
+***
+
+## Step 3 – Evaluate risk and intent
+
+1. Compare **what the code visually appears to do** with what the raw text actually encodes.  
+   - Look for misleading indentation, reversed logic segments, or duplicated identifiers that differ only by homoglyphs.  
+2. Consider whether this could confuse reviewers or hide behavior (Trojan Source pattern), even if the code is currently benign. [owasp](https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing)
+
+Use this rule of thumb:
+
+- If the characters make the code harder to read, review, or diff, and they are not strictly required, treat them as a security and maintainability risk.
+
+***
+
+## Step 4 – Decide: remove, replace, or accept (with justification)
+
+For each finding, choose one:
+
+- **Remove / normalize (default)**  
+  - Strip bidirectional control characters and replace confusable homoglyphs with their standard equivalents in identifiers and string literals, as long as it does not break required behavior. 
+
+- **Replace with safer representation**  
+  - If the text content must contain these characters as *data* (e.g., part of a localization artifact), move them into:  
+    - A separate data file, or  
+    - An encoded form (e.g., escaped sequences) that is clearly marked as such in comments.  
+
+- **Accept with documented justification (rare)**  
+  - Only if there is a strong, non‑security reason and you have:  
+    - Verified there is no misleading display or hidden logic, and  
+    - Documented the rationale in code comments and the ticket.
+
+Every decision should include a short note in the ticket, e.g., “Invisible bidi char in JS string removed; no functional change” or “Homoglyph in identifier replaced with standard Latin character.” [
+
+***
+
+## Step 5 – Prevent recurrence
+
+1. Add a lightweight code review guideline: **“Do not use invisible bidi controls or homoglyph tricks in source code; treat occurrences as suspicious unless clearly justified.”** [owasp](https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing)
+2. Where supported, enable IDE or pre‑commit checks that highlight or block these characters from entering the codebase.
+
